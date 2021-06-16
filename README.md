@@ -24,6 +24,7 @@ Navigate to the AWS Management Console, choose Services at the top of the page, 
 - Review the environment name and settings, and choose Create environment. Your environment will be provisioned and prepared after several minutes.
 - When the environment is ready, your IDE should open with a welcome note.
 
+
 You should now see your AWS Cloud9 environment. You need to be familiar with the three areas of the AWS Cloud9 console shown in the following screenshot:
 
 - File explorer: On the left side of the IDE, the file explorer shows a list of the files in your directory.
