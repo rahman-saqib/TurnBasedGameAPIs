@@ -34,8 +34,8 @@ You should now see your AWS Cloud9 environment. You need to be familiar with the
 # Step 3: Download the supporting code
 In this, you use JavaScript to interact with your Amazon DynamoDB database and Amazon SNS. Run the following commands in your AWS Cloud9 terminal to download and unpack the module code.
 
-`cd ~/environment `<br>`
-curl -sL http://d118jxrmrxsq90.cloudfront.net/turn-based.tar | tar -xv`
+``cd ~/environment ``<br>``
+curl -sL http://d118jxrmrxsq90.cloudfront.net/turn-based.tar | tar -xv``
 
 Run the following command in your AWS Cloud9 terminal to view your directories.
 
