@@ -35,12 +35,16 @@ You should now see your AWS Cloud9 environment. You need to be familiar with the
 # Step 3: Download the supporting code
 In this, you use JavaScript to interact with your Amazon DynamoDB database and Amazon SNS. Run the following commands in your AWS Cloud9 terminal to download and unpack the module code.
 
-``cd ~/environment ``<br>``
-curl -sL http://d118jxrmrxsq90.cloudfront.net/turn-based.tar | tar -xv``
+```
+cd ~/environment 
+curl -sL http://d118jxrmrxsq90.cloudfront.net/turn-based.tar | tar -xv
+```
 
 Run the following command in your AWS Cloud9 terminal to view your directories.
 
-`ls`
+```
+ls
+```
 
 
 
@@ -52,15 +56,20 @@ You should see two directories in the AWS Cloud9 file explorer:
 
 Run the following command in your AWS Cloud9 terminal to install the dependencies for both directories.
 
-`npm install --prefix scripts/ && npm install --prefix application`
-
+```
+npm install --prefix scripts/ && npm install --prefix application
+```
 Run the following command in your AWS Cloud9 terminal to set your AWS Region in an environment file. This example uses us-east-1, but enter your AWS Region of choice to use for the lab. 
 
-`echo "export AWS_REGION=us-east-1" >> env.sh && source env.sh`
+```
+echo "export AWS_REGION=us-east-1" >> env.sh && source env.sh
+```
 
 You use the **env.sh** file to store environment variables of resources and other parameters you need in this lab. If you take a break during this lab and then start a new session in your AWS Cloud9 environment, be sure to reload your environment variables by executing the following command in your terminal:
 
-`source env.sh`
+```
+source env.sh
+```
 
 
 
