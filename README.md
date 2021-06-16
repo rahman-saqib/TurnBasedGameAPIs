@@ -1,4 +1,5 @@
 # Turn Based Game
+
 Building a turn-based game with Amazon DynamoDB and Amazon SNS
 
 # Prerequisite
