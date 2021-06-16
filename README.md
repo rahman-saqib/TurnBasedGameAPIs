@@ -1,5 +1,4 @@
 # Turn Based Game
-
 Building a turn-based game with Amazon DynamoDB and Amazon SNS
 
 # Prerequisite
@@ -37,6 +36,31 @@ In this, you use JavaScript to interact with your Amazon DynamoDB database and A
 
 `cd ~/environment `<br>`
 curl -sL http://d118jxrmrxsq90.cloudfront.net/turn-based.tar | tar -xv`
+
+Run the following command in your AWS Cloud9 terminal to view your directories.
+
+`ls`
+
+
+
+You should see two directories in the AWS Cloud9 file explorer:
+
+**Application**: The application directory contains example code for the turn-based game application. This code is similar to the code you would have in your real turn-based game application backend.
+
+**Scripts**: The scripts directory contains administrator-level scripts, such as for creating AWS resources or loading data into your database.
+
+Run the following command in your AWS Cloud9 terminal to install the dependencies for both directories.
+
+`npm install --prefix scripts/ && npm install --prefix application`
+
+Run the following command in your AWS Cloud9 terminal to set your AWS Region in an environment file. This example uses us-east-1, but enter your AWS Region of choice to use for the lab. 
+
+`echo "export AWS_REGION=us-east-1" >> env.sh && source env.sh`
+
+You use the **env.sh** file to store environment variables of resources and other parameters you need in this lab. If you take a break during this lab and then start a new session in your AWS Cloud9 environment, be sure to reload your environment variables by executing the following command in your terminal:
+
+`source env.sh`
+
 
 
 
