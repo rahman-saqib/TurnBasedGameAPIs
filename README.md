@@ -49,7 +49,7 @@ An AWS Account with root priviliges
 ## Table of contents
 
 1. [Background and Setup](#1-Background-and-setup)
-2. [Create a security token](#2-create-a-security-token)
+2. [Provision a database](#2-Provision-a-database)
 3. [Create table **genre** with GraphQL](#3-create-table-genre-with-graphql)
 4. [Insert data in **genre**  with GraphQL](#4-insert-data-in-the-table-with-graphql)
 5. [Retrieve values of **genre** table](#5-retrieving-list-of-values)
@@ -121,6 +121,14 @@ You use the **env.sh** file to store environment variables of resources and othe
 ```
 source env.sh
 ```
+
+[🏠 Back to Table of Contents](#table-of-contents)
+
+
+
+# 2. Provision a database
+
+In this module, you provision an Amazon DynamoDB database and learn how to use DynamoDB to store information about your turn-based game. 
 
 
 
