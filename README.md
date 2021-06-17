@@ -1,18 +1,69 @@
+# Intoduction
+
+In this session, you learn how to build a multiplayer, turn-based game using Amazon DynamoDB and Amazon Simple Notification Service (Amazon SNS).
+
+Amazon DynamoDB is a fully-managed, NoSQL database that provides lightning-fast performance at any scale.
+
+Amazon SNS is a high-volume messaging service that allows for pub/sub functionality as well as messaging directly to SMS, email, or mobile applications.
+
+## Why use both Amazon DynamoDB and Amazon SNS for a game application?
+
+Amazon DynamoDB and Amazon SNS are common choices for use in game applications. Both services provide high-scalability with ease of use and straight-forward pricing.
+
+Some of the key reasons to use Amazon DynamoDB and Amazon SNS for your game application are:
+
+• Performance: Amazon DynamoDB provides single-digit millisecond latency at any scale.
+
+• Pay-per-use: Both Amazon DynamoDB and Amazon SNS offer pay-per-use pricing models. This eases development and ensures your bill only grows as your user base does.
+
+• Fully-managed: Both Amazon DynamoDB and Amazon SNS do not require you to provision servers, perform upgrades, or handle failovers. All operations are managed by AWS, allowing you to focus on building your application.
+
+
+
 # Turn Based Game
 Building a turn-based game with Amazon DynamoDB and Amazon SNS
 
 # Prerequisite
 An AWS Account with root priviliges
 
-# Background and setup
+# Technologies used:
+
+• Active AWS Account**
+
+• Browser: AWS recommends Chrome
+
+• Amazon DynamoDB
+
+• Amazon SNS
+
+• Amazon Cloud9
+
+• Amazon Cognito
+
+• AWS Lambda
+
+• Amazon API Gateway
+
+• AWS SDK for Node.js
+
+## Table of contents
+
+1. [Background and Setup](#1-Background-and-setup)
+2. [Create a security token](#2-create-a-security-token)
+3. [Create table **genre** with GraphQL](#3-create-table-genre-with-graphql)
+4. [Insert data in **genre**  with GraphQL](#4-insert-data-in-the-table-with-graphql)
+5. [Retrieve values of **genre** table](#5-retrieving-list-of-values)
+6. [Create **movie** table](#6-creating-a-movies-table)
+
+# 1. Background and Setup
 Imagine you are building an online application where users can play Nim, a turn-based strategy game. In Nim, there are three heaps of objects. Two players alternate turns removing any number of objects from a single pile. The goal of the game is to force the other player to remove the last object.
 
 As part of your application, you need to save the state of an existing game. You also need to notify users at various points in a game. You notify them when a user invites them to a new game, when it is their turn to play, and when a winner has been decided.
 
-# Step 1: Create an AWS account
+## Step 1: Create an AWS account
 Use a personal AWS account or create a new AWS account for this lab. Do not use an organizational account so that you have full access to the necessary services and do not leave behind any resources. If you do not delete the resources when you are finished, **you may incur AWS charges**.
 
-# Step 2: Set up your AWS Cloud9 IDE
+## Step 2: Set up your AWS Cloud9 IDE
 To set up your AWS Cloud9 development environment:
 
 Navigate to the AWS Management Console, choose Services at the top of the page, and then choose Cloud9 under Developer Tools.
@@ -32,7 +83,7 @@ You should now see your AWS Cloud9 environment. You need to be familiar with the
 - Terminal: On the lower right area of the IDE, this is where you run commands to execute code samples.
 ![alt text](https://d1.awsstatic.com/Getting%20Started/AWS-Labs-Turn-Based-Game/turn-based-game-cloud9.a8b55e4797f1a0dc1a7f55da0cfb94065fb2bbad.png)
 
-# Step 3: Download the supporting code
+## Step 3: Download the supporting code
 In this, you use JavaScript to interact with your Amazon DynamoDB database and Amazon SNS. Run the following commands in your AWS Cloud9 terminal to download and unpack the module code.
 
 ```
