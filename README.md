@@ -345,6 +345,8 @@ Error updating item:  The conditional request failed
 
 Your conditional requests failed this time. The requesting user -- *theseconduser* -- was the most recent player to move. Further, the changed heap -- *heap1* -- already had a value of 3, meaning the user didn’t change anything. Because of this, the request was rejected.
 
+[🏠 Back to Table of Contents](#table-of-contents)
+
 
 
 
