@@ -217,6 +217,135 @@ The schema of each game item is as follows:
 
 ![alt text](https://d1.awsstatic.com/Getting%20Started/AWS-Labs-Turn-Based-Game/turn-based-game-schema.e4cd3826657521e17bd481d2063d8ecd5cf7fe48.png)
 
+Each game includes a **GameId**, which is a unique identifier for the game. The attributes *User1* and *User2* store the usernames of the two users that are playing the game. The attributes *Heap1*, *Heap2*, and *Heap3* store the number of objects in each of the three heaps. Finally, the *LastMoveBy* attribute indicates the player who made the most recent move.
+
+In the scripts/ directory, there is a createGame.js file that adds an example game to your table. The contents of the file are as follows:
+
+```
+const AWS = require('aws-sdk')
+const documentClient = new AWS.DynamoDB.DocumentClient()
+
+const params = {
+  TableName: 'turn-based-game',
+  Item: {
+    gameId: '5b5ee7d8',
+    user1: 'myfirstuser',
+    user2: 'theseconduser',
+    heap1: 5,
+    heap2: 4,
+    heap3: 5,
+    lastMoveBy: 'myfirstuser'
+  }
+}
+
+documentClient.put(params).promise()
+  .then(() => console.log('Game added successfully!'))
+  .catch((error) => console.log('Error adding game', error))
+```
+
+You import the AWS SDK and then create an instance of the DynamoDB Document Client. The Document Client is a higher-level abstraction over the low-level DynamoDB API and makes it easier to work with DynamoDB items. After creating the client, the script assembles the parameters for a **PutItem** API call, including the table name and the attributes on the item. Then it calls the **put()** method on the Document Client and logs out information on success or failure.
+
+You can run the script to insert a game into your table by running the following command in your terminal:
+
+```
+node scripts/createGame.js
+```
+
+You should see the following output in your terminal:
+
+``
+Game added successfully!
+``
+
+**Note**: If you run the command too quickly, you may get an error that the table is not yet available. Wait one minute, then try the command again.
+
+Great! You have now added a single game to your table. In the next step, you learn how to update that game item to simulate a user making a move.
+
+## Step 2c: Update a game item in your table
+
+Now that you have a game item in your table, you can learn how to simulate a player making a move for a game that’s in progress.
+
+There are two ways you could handle this operation. In the first way, you retrieve the item using the **GetItem** API. Then, you update the game item in your application according to the move made by the player. Finally, you replace the existing item in DynamoDB using the **PutItem** API. Although this option works, it requires multiple requests to your DynamoDB table and risks overwriting any changes that happened between fetching and re-writing your game item.
+
+The second way to handle this operation is to use the **UpdateItem** API call in DynamoDB. With the **UpdateItem** API, you can update your DynamoDB item in place via a single request. You specify the item you want changed, the attributes to change, and any conditions to want to assert on the item. This is the preferred way to make a change to an item because it doesn't require multiple calls to your database.
+
+In the **scripts/** directory, there is a file called **performMove.js** which has the following contents:
+
+```
+const AWS = require('aws-sdk')
+const documentClient = new AWS.DynamoDB.DocumentClient()
+
+const performMove = async ({ gameId, user, changedHeap, changedHeapValue }) => {
+  if (changedHeapValue < 0 ) {
+    throw new Error('Cannot set heap value below 0')
+  }
+  const params = {
+    TableName: 'turn-based-game',
+    Key: { 
+      gameId: gameId
+    },
+    UpdateExpression: `SET lastMoveBy = :user, ${changedHeap} = :changedHeapValue`,
+    ConditionExpression: `(user1 = :user OR user2 = :user) AND lastMoveBy <> :user AND ${changedHeap} > :changedHeapValue`,
+    ExpressionAttributeValues: {
+      ':user': user,
+      ':changedHeapValue': changedHeapValue,
+    },
+    ReturnValues: 'ALL_NEW'
+  }
+  try {
+    const resp = await documentClient.update(params).promise()
+    console.log('Updated game: ', resp.Attributes)
+  } catch (error) {
+    console.log('Error updating item: ', error.message)
+  }
+}
+
+performMove({ gameId: '5b5ee7d8', user: 'theseconduser', changedHeap: 'heap1', changedHeapValue: 3 })
+```
+
+This script is a little complicated, so let’s take it step-by-step.
+
+Like the previous script, you import the AWS SDK and create a DynamoDB Document Client instance.
+
+Then, you define a method called **performMove**. This method is similar to an internal method that would be used in your application when a user requests to make a move. The script assembles the parameters for an **UpdateItem** API call. First, it changes two attributes on the game -- the last user to make a move, and the number of elements in the changed heap.
+
+The UpdateItem API parameters then make some assertions about the current state of the game. The ConditionExpression is evaluated before the item is updated to confirm that the item is in the state you want. You are making the following three assertions in your condition expression:
+
+  1. That the user requesting to perform a move is one of the two users in the game;
+  2. That the current turn belongs to the user requesting to perform the move;
+  3. That the heap being changed has a current value higher than the value to which is it being changed.
+
+Finally, the parameters state a **ReturnValue** of **ALL_NEW**, which means that DynamoDB returns the entire item after its values have been updated. Once you have this, your application can evaluate the game to see if there’s a winner.
+
+At the bottom of the file is an example of how this method is called in your application. You can execute the script with the following command:
+
+```
+node scripts/performMove.js
+```
+
+You should see the following output in your terminal:
+
+``
+Updated game:  { heap2: 4,
+  heap1: 3,
+  heap3: 5,
+  gameId: '5b5ee7d8',
+  user2: 'theseconduser',
+  user1: 'myfirstuser',
+  lastMoveBy: 'theseconduser' }
+``
+
+You can see that the write was successful and the game has been updated.
+
+Try running the script again in your terminal. You should see the following output:
+
+``
+Error updating item:  The conditional request failed
+``
+
+Your conditional requests failed this time. The requesting user -- *theseconduser* -- was the most recent player to move. Further, the changed heap -- *heap1* -- already had a value of 3, meaning the user didn’t change anything. Because of this, the request was rejected.
+
+
 
 
 
