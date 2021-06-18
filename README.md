@@ -413,6 +413,8 @@ You should also receive a message on your phone.
 
 Success! You were able to send a message via Amazon SNS. You use Amazon SNS to notify your users of a number of events in your turn-based game. 
 
+[🏠 Back to Table of Contents](#table-of-contents)
+
 
 
 
