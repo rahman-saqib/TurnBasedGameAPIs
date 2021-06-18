@@ -46,7 +46,7 @@ An AWS Account with root priviliges
 
 1. [Background and Setup](#1-Background-and-setup)
 2. [Provision a database](#2-Provision-a-database)
-3. [Create table **genre** with GraphQL](#3-create-table-genre-with-graphql)
+3. [Set up notifications with Amazon SNS](#3-Set-up-notifications-with-Amazon-SNS)
 4. [Insert data in **genre**  with GraphQL](#4-insert-data-in-the-table-with-graphql)
 5. [Retrieve values of **genre** table](#5-retrieving-list-of-values)
 6. [Create **movie** table](#6-creating-a-movies-table)
@@ -347,9 +347,71 @@ Your conditional requests failed this time. The requesting user -- *theseconduse
 
 [🏠 Back to Table of Contents](#table-of-contents)
 
+# 3. Set up notifications with Amazon SNS
 
+When building a turn-based game, you need some way to contact your users to notify them of important events. This includes alerting them that a new game is started, notifying them that it is their turn to play, or informing them that a game has ended.
 
+In this module, you use Amazon Simple Notification Service (Amazon SNS) to notify your users. Amazon SNS is a fully-managed messaging system that allows for pub/sub functionality as well as direct messaging to SMS and email.
 
+Amazon SNS has pay-per-use pricing, so you are only billed for the messages you send. You don’t need to provision throughput ahead of time.
+
+## Step 3a: Send SMS messages via Amazon SNS
+
+There are two different ways to use Amazon SNS. The first way is to create a topic and publish messages to it. You can then configure multiple subscribers to the topic, and each subscriber receives a copy of a message when it is published. This approach is using Amazon SNS in a pub/sub manner and is commonly used for broadcasting messages between services in a microservices architecture.
+
+The second way to use Amazon SNS is to publish messages directly to a consumer. This method is the approach used in this module. Amazon SNS allows you to publish directly to an SMS number for simple text messaging.
+
+In the **scripts/** directory, there is a **sendMessage.js** file. The contents of that file are as follows:
+
+```
+const AWS = require('aws-sdk')
+const sns = new AWS.SNS();
+
+const sendMessage = async ({ phoneNumber, message }) => {
+  const params = {
+    Message: message,
+    PhoneNumber: phoneNumber
+  }
+
+  return sns.publish(params).promise()
+}
+
+sendMessage({ phoneNumber: process.env.PHONE_NUMBER, message: 'Sending a message from SNS!'})
+  .then(() => console.log('Sent message successfully'))
+  .catch((error) => console.log('Error sending SNS: ', error.message))
+```
+
+Like in the DynamoDB module, you are importing the AWS SDK for JavaScript in Node.js and creating a client for the service you are using.
+
+There is a **sendMessage** function that is similar to a function you have in your application. It takes a phone number and message, and it publishes it as an SMS message.
+
+At the bottom of the file is an example invocation of that message. You can test this out in your console.
+
+First, export your phone number as an environment variable. You need to include the country code in the number. If you are in the United States, that country code is **1**.
+
+Use the following command to save and export your phone number, substituting your number for the default listed:
+
+```
+echo "export PHONE_NUMBER=+15555555555" >> env.sh && source env.sh
+```
+
+Next, execute the **sendMessage.js** script by entering the following command in your terminal:
+
+```
+node scripts/sendMessage.js
+```
+
+You should see the following output in your terminal:
+
+``
+Sent message successfully
+``
+
+You should also receive a message on your phone.
+
+![alt text](https://d1.awsstatic.com/Getting%20Started/AWS-Labs-Turn-Based-Game/turn-based-game-sms.e68686bcc577495147e4d76ea904b509078d70b5.png)
+
+Success! You were able to send a message via Amazon SNS. You use Amazon SNS to notify your users of a number of events in your turn-based game. 
 
 
 
