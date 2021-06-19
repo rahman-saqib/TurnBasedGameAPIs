@@ -325,7 +325,7 @@ node scripts/performMove.js
 
 You should see the following output in your terminal:
 
-``
+```
 Updated game:  { heap2: 4,
   heap1: 3,
   heap3: 5,
@@ -333,7 +333,7 @@ Updated game:  { heap2: 4,
   user2: 'theseconduser',
   user1: 'myfirstuser',
   lastMoveBy: 'theseconduser' }
-``
+```
 
 You can see that the write was successful and the game has been updated.
 
@@ -362,6 +362,7 @@ There are two different ways to use Amazon SNS. The first way is to create a top
 The second way to use Amazon SNS is to publish messages directly to a consumer. This method is the approach used in this module. Amazon SNS allows you to publish directly to an SMS number for simple text messaging.
 
 In the **scripts/** directory, there is a **sendMessage.js** file. The contents of that file are as follows:
+
 
 ```
 const AWS = require('aws-sdk')
