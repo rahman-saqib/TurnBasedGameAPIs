@@ -420,7 +420,7 @@ Success! You were able to send a message via Amazon SNS. You use Amazon SNS to n
 
 In this module, you configure Amazon Cognito for use as the authentication provider in your application. Amazon Cognito is a fully managed authentication provider that allows for user sign-up, verification, login, and more.
 
-Amazon Cognito has two different components: user pools and identity pools. User pools are standard user directories where users sign in through Amazon Cognito or through a third-party identity, such as Google or GitHub. After successful authentication, users receive tokens, such as access tokens or ID tokens, that can be used to access resources in the backend.
+Amazon Cognito has two different components: *user pools* and *identity pools*. User pools are standard user directories where users sign in through Amazon Cognito or through a third-party identity, such as Google or GitHub. After successful authentication, users receive tokens, such as access tokens or ID tokens, that can be used to access resources in the backend.
 
 In contrast, identity pools provide a way for users to receive temporary AWS credentials for accessing AWS resources. This could be used to provide limited, direct access to an AWS Lambda function, an Amazon DynamoDB table, or other resources.
 
@@ -430,11 +430,11 @@ In the following steps below, you create an Amazon Cognito user pool. Then you c
 
 ## Step 4a: Create an Amazon Cognito user pool
 
-A user pool is a user directory -- all user and group management happens in your pool. When creating a user pool, you need to specify rules for your user pool, including your password policy and the required attributes.
+A *user pool* is a user directory -- all user and group management happens in your pool. When creating a user pool, you need to specify rules for your user pool, including your password policy and the required attributes.
 
-By default, Amazon Cognito includes a number of standard attributes that are not required by your user. In your application, you want the phone_number attribute to be a required attribute because users are notified via SMS message. Thus, when creating your user pool, mark phone_number as required.
+By default, Amazon Cognito includes a number of standard attributes that are not required by your user. In your application, you want the *phone_number* attribute to be a required attribute because users are notified via SMS message. Thus, when creating your user pool, mark phone_number as required.
 
-In the scripts/ directory, there is a file called create-user-pool.sh. The contents are as follows:
+In the **scripts/** directory, there is a file called **create-user-pool.sh.** The contents are as follows:
 
 ```
 USER_POOL_ID=$(aws cognito-idp create-user-pool \
@@ -469,9 +469,9 @@ echo "User Pool created with id ${USER_POOL_ID}"
 echo "export USER_POOL_ID=${USER_POOL_ID}" >> env.sh
 ```
 
-This script uses the AWS Command Line Interface (AWS CLI) to create a user pool. You give your user pool a name -- turn-based-users -- and specify your password policies. For the password, this script requires a minimum length of eight characters, and the password must include an uppercase letter, a lowercase letter, and a number.
+This script uses the AWS Command Line Interface (AWS CLI) to create a user pool. You give your user pool a name -- *turn-based-users* -- and specify your password policies. For the password, this script requires a minimum length of eight characters, and the password must include an uppercase letter, a lowercase letter, and a number.
 
-Additionally, you specify in your schema that the phone_number attribute is a required attribute for all users, as this is needed for notifying your users of important game events. 
+Additionally, you specify in your schema that the *phone_number* attribute is a required attribute for all users, as this is needed for notifying your users of important game events. 
 
 You can create your user pool by executing the script with the following command:
 
@@ -629,6 +629,8 @@ const verifyToken = async (idToken) => {
 This function verifies an ID token that has been passed up with a request. The ID token given by Amazon Cognito is a JSON Web Token, and the **verifyToken** function confirms that the token was signed by your trusted source and to identify the user. This function is used in endpoints that require authentication to ensure that the requesting user has access.
 
 In subsequent modules, you use these four authentication functions in your backend application.
+
+[🏠 Back to Table of Contents](#table-of-contents)
 
 
 
