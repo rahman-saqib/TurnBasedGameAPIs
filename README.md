@@ -47,7 +47,7 @@ An AWS Account with root priviliges
 1. [Background and Setup](#1-Background-and-setup)
 2. [Provision a database](#2-Provision-a-database)
 3. [Set up notifications with Amazon SNS](#3-Set-up-notifications-with-Amazon-SNS)
-4. [Insert data in **genre**  with GraphQL](#4-insert-data-in-the-table-with-graphql)
+4. [Add authentication to your application](#4-Add-authentication-to-your-application)
 5. [Retrieve values of **genre** table](#5-retrieving-list-of-values)
 6. [Create **movie** table](#6-creating-a-movies-table)
 
@@ -415,6 +415,220 @@ You should also receive a message on your phone.
 Success! You were able to send a message via Amazon SNS. You use Amazon SNS to notify your users of a number of events in your turn-based game. 
 
 [🏠 Back to Table of Contents](#table-of-contents)
+
+# 4 Add authentication to your application
+
+In this module, you configure Amazon Cognito for use as the authentication provider in your application. Amazon Cognito is a fully managed authentication provider that allows for user sign-up, verification, login, and more.
+
+Amazon Cognito has two different components: user pools and identity pools. User pools are standard user directories where users sign in through Amazon Cognito or through a third-party identity, such as Google or GitHub. After successful authentication, users receive tokens, such as access tokens or ID tokens, that can be used to access resources in the backend.
+
+In contrast, identity pools provide a way for users to receive temporary AWS credentials for accessing AWS resources. This could be used to provide limited, direct access to an AWS Lambda function, an Amazon DynamoDB table, or other resources.
+
+In this tutorial, you use Amazon Cognito user pools. You allow users to register via your application. After they’ve registered, they can login via a client to receive an ID token. This ID token can be passed as a header to your application to authenticate the user.
+
+In the following steps below, you create an Amazon Cognito user pool. Then you create a client to access the user pool. Finally, you look at some example code to interact with the user pool.
+
+## Step 4a: Create an Amazon Cognito user pool
+
+A user pool is a user directory -- all user and group management happens in your pool. When creating a user pool, you need to specify rules for your user pool, including your password policy and the required attributes.
+
+By default, Amazon Cognito includes a number of standard attributes that are not required by your user. In your application, you want the phone_number attribute to be a required attribute because users are notified via SMS message. Thus, when creating your user pool, mark phone_number as required.
+
+In the scripts/ directory, there is a file called create-user-pool.sh. The contents are as follows:
+
+```
+USER_POOL_ID=$(aws cognito-idp create-user-pool \
+  --pool-name turn-based-users \
+  --policies '
+      {
+        "PasswordPolicy": {
+          "MinimumLength": 8,
+          "RequireUppercase": true,
+          "RequireLowercase": true,
+          "RequireNumbers": true,
+          "RequireSymbols": false
+        }
+      }' \
+  --schema '[
+      {
+        "Name": "phone_number",
+        "StringAttributeConstraints": {
+            "MinLength": "0",
+            "MaxLength": "2048"
+        },
+        "DeveloperOnlyAttribute": false,
+        "Required": true,
+        "AttributeDataType": "String",
+        "Mutable": true
+      }
+  ]' \
+  --query 'UserPool.Id' \
+  --output text)
+
+echo "User Pool created with id ${USER_POOL_ID}"
+echo "export USER_POOL_ID=${USER_POOL_ID}" >> env.sh
+```
+
+This script uses the AWS Command Line Interface (AWS CLI) to create a user pool. You give your user pool a name -- turn-based-users -- and specify your password policies. For the password, this script requires a minimum length of eight characters, and the password must include an uppercase letter, a lowercase letter, and a number.
+
+Additionally, you specify in your schema that the phone_number attribute is a required attribute for all users, as this is needed for notifying your users of important game events. 
+
+You can create your user pool by executing the script with the following command:
+
+```
+bash scripts/create-user-pool.sh
+```
+
+You should see the following output:
+
+```
+User Pool created with id <user-pool-id>
+```
+
+In the next step, you create a client to access the user pool.
+
+## Step 4b: Create a user pool client
+
+Now that you have a user pool configured, you need to make a *user pool client*. A user pool client is used to call unauthenticated methods on the user pool, such as register and sign in.
+
+The user pool client is used by your backend Node.js application. To register or sign in, a user makes an HTTP POST request to your application containing the relevant properties. Your application uses the user pool client and forwards these properties to your Amazon Cognito user pool. Then, your application returns the proper data or error message.
+
+There is a file in the **scripts/** directory called **create-user-pool-client.sh** for creating a user pool client. The contents of the file are as follows:
+
+```
+source env.sh
+
+CLIENT_ID=$(aws cognito-idp create-user-pool-client \
+  --user-pool-id ${USER_POOL_ID} \
+  --client-name turn-based-backend \
+  --no-generate-secret \
+  --explicit-auth-flows ADMIN_NO_SRP_AUTH \
+  --query 'UserPoolClient.ClientId' \
+  --output text)
+
+echo "User Pool Client created with id ${CLIENT_ID}"
+echo "export COGNITO_CLIENT_ID=${CLIENT_ID}" >> env.sh
+```
+
+The script creates a user pool client for your newly-created user pool. It uses the **ADMIN_NO_SRP_AUTH** flow, which is a flow that can be used in a server-side application. Because you’re doing a server-side flow, you don’t need a client secret used in a client-side flow, such as on a mobile device or in a single-page application.
+
+Run the script to create the user pool client with the following command:
+
+```
+bash scripts/create-user-pool-client.sh
+```
+
+You should see the following output:
+
+```
+User Pool Client created with id <client-id>
+```
+
+In the last step of this module, you learn about the authentication code that is used in your application.
+
+## Step 4c: Review authentication code
+
+Now that you have created a user pool and a client to access the pool, let’s see how you use Amazon Cognito in your application.
+
+In the **application/** directory of your project, there is a file called **auth.js**. This file contains a few authentication helpers for your application. There are four core functions to that file. Let’s review them in turn.
+
+The first function is **createCognitoUser** and is used when registering a new user in Amazon Cognito. The function looks as follows:
+
+```
+const createCognitoUser = async (username, password, email, phoneNumber) => {
+  const signUpParams = {
+    ClientId: process.env.COGNITO_CLIENT_ID,
+    Username: username,
+    Password: password,
+    UserAttributes: [
+      {
+        Name: 'email',
+        Value: email
+      },
+      {
+        Name: 'phone_number',
+        Value: phoneNumber
+      }
+    ]
+  }
+  await cognitoidentityserviceprovider.signUp(signUpParams).promise()
+  const confirmParams = {
+    UserPoolId: process.env.USER_POOL_ID,
+    Username: username
+  }
+  await cognitoidentityserviceprovider.adminConfirmSignUp(confirmParams).promise()
+  return {
+    username,
+    email,
+    phoneNumber
+  }
+}
+```
+
+It uses the Amazon Cognito client ID that you set in the previous step, as well as the username, password, email, and phone number given by the user, to create a new user. Additionally, you immediately confirm the user so that the user can sign in. Usually, you opt for a confirmation process that verified the user’s email and/or mobile phone number so that you have a contact method for them. That’s out of scope for this tutorial, so you can just automatically confirm new users.
+
+The second core method is the login function that is used when registered users are authenticating. The code is as shown below:
+
+```
+const login = async (username, password) => {
+  const params = {
+    ClientId: process.env.COGNITO_CLIENT_ID,
+    UserPoolId: process.env.USER_POOL_ID,
+    AuthFlow: 'ADMIN_NO_SRP_AUTH',
+    AuthParameters: {
+      USERNAME: username,
+      PASSWORD: password
+    }
+  }
+  const { AuthenticationResult: { IdToken: idToken } }= await cognitoidentityserviceprovider.adminInitiateAuth(params).promise()
+  return idToken
+}
+```
+
+Like in the **createCognitoUser** function, you use the Client Id and the given parameters to make a call to Amazon Cognito. The **adminInitiateAuth** method for Amazon Cognito authenticates the user and return tokens if the authentication method passes. You use ID tokens for authentication, so that is what you return for successful user logins.
+
+The third function is **fetchUserByUsername**. You use this function to fetch a user object by a given username to find the phone number for a user you need to notify. The code is as follows:
+
+```
+const fetchUserByUsername = async username => {
+  const params = {
+    UserPoolId: process.env.USER_POOL_ID,
+    Username: username
+  };
+  const user = await cognitoidentityserviceprovider.adminGetUser(params).promise();
+  const phoneNumber = user.UserAttributes.filter(attribute => attribute.Name === "phone_number")[0].Value;
+  return {
+    username,
+    phoneNumber
+  };
+};
+```
+
+The function takes a single parameter, username. It then calls the **adminGetUser** function from the Amazon Cognito client. Then, it filters through the attributes to find the user’s phone number and returns an object with the user’s username and phone number.
+
+Finally, there is a **verifyToken** function. The contents of this function are as follows:
+
+```
+const verifyToken = async (idToken) => {
+  function getKey(header, callback){
+    client.getSigningKey(header.kid, function(err, key) {
+      var signingKey = key.publicKey || key.rsaPublicKey;
+      callback(null, signingKey);
+    });
+  }
+
+  return new Promise((res, rej) => {
+    jwt.verify(idToken, getKey, {}, function(err, decoded) {
+      if (err) { rej(err) }
+      res(decoded)
+    })
+  })
+}
+```
+
+This function verifies an ID token that has been passed up with a request. The ID token given by Amazon Cognito is a JSON Web Token, and the **verifyToken** function confirms that the token was signed by your trusted source and to identify the user. This function is used in endpoints that require authentication to ensure that the requesting user has access.
+
+In subsequent modules, you use these four authentication functions in your backend application.
 
 
 
