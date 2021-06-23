@@ -48,8 +48,8 @@ An AWS Account with root priviliges
 2. [Provision a database](#2-Provision-a-database)
 3. [Set up notifications with Amazon SNS](#3-Set-up-notifications-with-Amazon-SNS)
 4. [Add authentication to your application](#4-Add-authentication-to-your-application)
-5. [Deploy your application to AWS Lambda and Amazon API Gateway](# 5-Deploy-your-application-to-AWS-Lambda-and-Amazon-API-Gateway)
-6. [Create **movie** table](#6-creating-a-movies-table)
+5. [Deploy your application to AWS Lambda and Amazon API Gateway](#5-Deploy-your-application-to-AWS-Lambda-and-Amazon-API-Gateway)
+6. [Test your application](#6-Test-your-application)
 
 
 
@@ -854,6 +854,168 @@ You should see the following output in your terminal:
 Success! You hit your API endpoint. This triggered your Lambda function, which retrieved the game details for your requested game from DynamoDB.
 
 [🏠 Back to Table of Contents](#table-of-contents)
+
+
+# 6. Test your application
+
+In this module, you use your application that you’ve deployed. Before you do that, let’s do a quick recap of the AWS components you’re using in your application:
+
+   • Amazon DynamoDB for data storage, including the AWS SDK for JavaScript in Node.js with IAM authentication to read and write data to your database.
+   • Amazon SNS for SMS messaging to alert your users of important events in the game.
+   • Amazon Cognito for user registration and authentication.
+   • AWS Lambda for compute.
+   • Amazon API Gateway for HTTP-based access to your Lambda function.
+
+Let’s see how each of these pieces tie together. In the following steps, you walk through your different application endpoints using these components.
+
+First, you start with a **Registration** endpoint, where a new user signs up and creates their account.
+
+Second, you use a **Login** endpoint where a user can use a client (such as a web application or a mobile app) to authenticate and receive an ID token.
+
+Third, you use a **CreateGame** endpoint to create a new game between two users.
+
+Fourth, you use the **FetchGame** endpoint to retrieve the current state of a game for display in a browser.
+
+Finally, you use the **PerformMove** endpoint to simulate users makig moves and to trigger SMS messages.
+
+## Step 6a: Register a new user
+
+The first workflow you review is the **Registration** endpoint. At this endpoint, a new user signs up by providing login information, like username and password.
+
+You create two users in this step so that you can simulate the two users alternating moves in a game of Nim. 
+
+As you look at these endpoints, the relevant snippets of code that are invoked by the endpoint are shown in this guide.
+
+Your registration endpoint is available by making a POST request to the **/users** endpoint. You can see the logic for this endpoint in the **application/app.js** file about halfway down:
+
+```
+// Create user
+app.post("/users", wrapAsync(async (req, res) => {
+  const validated = validateCreateUser(req.body);
+  if (!validated.valid) {
+    throw new Error(validated.message);
+  }
+  const user = await createCognitoUser(
+    req.body.username,
+    req.body.password,
+    req.body.email,
+    req.body.phoneNumber
+  );
+  res.json(user);
+}));
+```
+
+Your handler takes the request payload and validates that it has the required properties. If all required properties are present, it creates a new user in Amazon Cognito.
+
+You already reviewed the **createCognitoUser** function in the Amazon Cognito module, so we won’t recap it here.
+
+Try invoking your **Registration** endpoint to create a new user. Run the following command in your terminal:
+
+```
+curl -X POST ${BASE_URL}/users \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"username": "myfirstuser",
+	"password": "Password1",
+	"phoneNumber": "'${PHONE_NUMBER}'",
+	"email": "test@email.com"
+}'
+```
+
+You should see the following output in your terminal:
+
+```
+{"username":"myfirstuser","email":"test@email.com","phoneNumber":"+15555555555"}
+```
+
+Great! You’ve successfully created your user. Now, create a second user so that you can simulate playing a game.
+
+Run the following command in your terminal:
+
+```
+curl -X POST ${BASE_URL}/users \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"username": "theseconduser",
+	"password": "Password1",
+	"phoneNumber": "'${PHONE_NUMBER}'",
+	"email": "test@email.com"
+}'
+```
+
+You should see the following output in your terminal:
+
+```
+{"username":"theseconduser","email":"test@email.com","phoneNumber":"+15555555555"}
+```
+
+Now, let’s log in and receive an ID token for each of the two users.
+
+## Step 6b: Login to fetch user credentials
+
+Your second endpoint is the **Login** endpoint. Users submit their username and password to this endpoint to receive an ID token, which is used to authenticate them on subsequent requests.
+
+To handle this authentication and token dispensing, your application has a **/login** endpoint. The handler is in **application/app.js** as follows:
+
+```
+// Login
+app.post('/login', wrapAsync(async (req, res) => {
+  const idToken = await login(req.body.username, req.body.password)
+  res.json({ idToken })
+}))
+```
+
+It expects the payload body to have *username* and *password* properties. It then calls your helper **login** function from your **auth.js** file. If the login is successful, it returns the ID token for the user.
+
+Let’s test it out with your first created user. Run the following command in your terminal:
+
+```
+curl -X POST ${BASE_URL}/login \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"username": "myfirstuser",
+	"password": "Password1"
+}'
+```
+
+You should see a response with an **idToken** property in your terminal:
+
+```
+{"idToken":"eyJraWQiO…."}
+```
+
+This ID Token is used in subsequent requests to authorize a user. Save the value of the ID token in your shell by copying the value of the token between the quotations, then running the following command:
+
+```
+export FIRST_ID_TOKEN=<idToken>
+```
+
+Do the same steps to login with your second user. Execute the following command in your terminal:
+
+```
+curl -X POST ${BASE_URL}/login \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"username": "theseconduser",
+	"password": "Password1"
+}'
+```
+You should see a response with an **idToken** property in your terminal:
+
+```
+{"idToken":"eyJraWQiOiI...."}
+```
+
+Again, copy the quoted value of the ID token and save it as an environment variable with the following command:
+
+```
+export SECOND_ID_TOKEN=<idToken>
+```
+
+**Note:** These identity tokens are temporary credentials that will expire over time. If you return to this tutorial after a period of time, you may need to re-run the steps above to generate new tokens.
+
+## Step 6c: Create a new game
+
 
 
 
