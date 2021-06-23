@@ -48,7 +48,7 @@ An AWS Account with root priviliges
 2. [Provision a database](#2-Provision-a-database)
 3. [Set up notifications with Amazon SNS](#3-Set-up-notifications-with-Amazon-SNS)
 4. [Add authentication to your application](#4-Add-authentication-to-your-application)
-5. [Retrieve values of **genre** table](#5-retrieving-list-of-values)
+5. [Deploy your application to AWS Lambda and Amazon API Gateway](# 5-Deploy-your-application-to-AWS-Lambda-and-Amazon-API-Gateway)
 6. [Create **movie** table](#6-creating-a-movies-table)
 
 
@@ -416,7 +416,7 @@ Success! You were able to send a message via Amazon SNS. You use Amazon SNS to n
 
 [🏠 Back to Table of Contents](#table-of-contents)
 
-# 4 Add authentication to your application
+# 4. Add authentication to your application
 
 In this module, you configure Amazon Cognito for use as the authentication provider in your application. Amazon Cognito is a fully managed authentication provider that allows for user sign-up, verification, login, and more.
 
@@ -632,8 +632,228 @@ In subsequent modules, you use these four authentication functions in your backe
 
 [🏠 Back to Table of Contents](#table-of-contents)
 
+# 5. Deploy your application to AWS Lambda and Amazon API Gateway
 
+In this module, you deploy your application code to AWS Lambda, a serverless computing service. With AWS Lambda, you don’t need to worry about server management or capacity planning. You simply upload the code you want to run, and AWS runs the code whenever a configured event trigger occurs.
 
+One of the event triggers you can use with Lambda is Amazon API Gateway. Amazon API Gateway lets you configure HTTP endpoints that forward requests to your AWS Lambda functions. Between Lambda and API Gateway, you can build a fully functioning web application without provisioning or managing any servers. Further, both Lambda and API Gateway are billed on a pay-per-use basis, meaning you only pay for what you use.
+
+In the following steps, you walk through setting up a Lambda function and configuring HTTP routes with API Gateway using the AWS Command Line Interface (AWS CLI). If you are building an application using Lambda and API Gateway, use a tool such as AWS Serverless Application Model (AWS SAM) or the Serverless Framework to manage your serverless applications using infrastructure-as-code.
+
+## Step 5a: Packaging your code and deploying it to Lambda
+
+First, you need to package up your function code and deploy it to AWS Lambda. Lambda expects you to upload a ZIP file containing all of your application code. Additionally, you specify a runtime to use and the file and function that serves as the entry point to your code. This entry point is called a *handler* and is called whenever an incoming event triggers your code.
+
+In addition to the function code, you also need to provide an AWS Identity and Access Management (IAM) role for your Lambda function. This role is assumed by your function upon execution so that it has permissions to access AWS resources, such as reading or writing from a database, sending messages to a queue, or logging output to Amazon CloudWatch.
+
+In the **scripts/** directory, there is a file called **create-lambda.sh**. This script does four things:
+
+   1. Zips up the contents of the **application/** directory for use in your Lambda function.
+   2. Creates an IAM role to be assumed by your Lambda function.
+   3. Adds an IAM policy to your IAM role that allows your Lambda function to access your DynamoDB table and publish messages to Amazon SNS.
+   4. Creates the Lambda function by uploading your zip file.
+
+If you want to see the AWS CLI commands used to run these steps, open the **scripts/create-lambda.sh** file in your file explorer.
+
+To execute the script, run the following command in your terminal:
+
+```
+bash scripts/create-lambda.sh
+```
+
+You should see the following output:
+
+```
+$ bash scripts/create-lambda.sh
+Building zip file
+Creating IAM role
+Adding policy to IAM role
+Sleeping for IAM role propagation
+Creating Lambda function
+Lambda function created with ARN <functionArn>
+```
+
+## Step 5b: Creating and configuring an API Gateway REST API
+
+Now that you have deployed your Lambda function, you can make it accessible over HTTP using Amazon API Gateway. API Gateway provides a powerful access layer to your backend services. It is highly configurable and provides for authentication, validation, rate-limiting, and more.
+
+In your **scripts/** directory, there is a file called **create-rest-api.sh** that provisions an API Gateway REST API and connects it to your Lambda function. This script handles a number of things, including:
+
+   1. Creates a REST API in API Gateway.
+   2. Configures a proxy resource and method in the REST API to send all incoming request paths and methods to a single Lambda function.
+   3. Adds the permissions for the REST API to trigger your Lambda function.
+
+API Gateway has a lot of configuration options, and this tutorial cannot cover all of the details. For additional detail, see Amazon API Gateway Concepts.
+
+Run the following command in your terminal to execute the script and configure your REST API:
+
+```
+bash scripts/create-rest-api.sh
+```
+
+You should see the following output in your terminal:
+
+```
+Creating REST API
+Fetching root resource
+Creating proxy resource
+Creating method
+Adding integration
+Creating deployment
+Fetching account ID
+Adding lambda permission
+REST API created
+
+Your API is available at: https://<id>.execute-api.<region>.amazonaws.com/prod
+```
+
+You’ve now configured your REST API to connect to your Lambda function. The end of the output included the base URL to access your REST API.
+
+The value of your base URL was added to the env.sh file. Source that file now to set the BASE_URL environment variable in your terminal.
+
+```
+source env.sh
+```
+
+## Step 5c: Testing your API endpoint
+
+Now that your API is live, let’s test it out. You’ll walk through a quick explanation of the code before testing one of your endpoints.
+
+The web application is built using Express.js, a popular Node.js web application framework. You don’t need to use an existing web framework like Express.js when building applications on AWS Lambda, but it can ease the learning curve if you have experience with Express.
+
+The core of the Express application is located in **application/app.js.** Open the file in the file explorer.
+
+```
+// application/app.js
+const express = require("express");
+const bodyParser = require("body-parser");
+const { createGame, fetchGame, performMove, handlePostMoveNotification } = require("./data");
+const {
+  createCognitoUser,
+  login,
+  fetchUserByUsername,
+  verifyToken
+} = require("./auth");
+const { validateCreateUser, validateCreateGame, validatePerformMove } = require("./validate");
+
+const app = express();
+app.use(bodyParser.json());
+
+function wrapAsync(fn) {
+  return function(req, res, next) {
+    fn(req, res, next).catch(next);
+  };
+}
+
+// Login
+app.post("/login", wrapAsync(async (req, res) => {
+  const idToken = await login(req.body.username, req.body.password);
+  res.json({ idToken });
+}));
+
+// Create user
+app.post("/users", wrapAsync(async (req, res) => {
+  const validated = validateCreateUser(req.body);
+  if (!validated.valid) {
+    throw new Error(validated.message);
+  }
+  const user = await createCognitoUser(
+    req.body.username,
+    req.body.password,
+    req.body.email,
+    req.body.phoneNumber
+  );
+  res.json(user);
+}));
+
+// Create new game
+app.post("/games", wrapAsync(async (req, res) => {
+  const validated = validateCreateGame(req.body);
+  if (!validated.valid) {
+    throw new Error(validated.message);
+  }
+  const token = await verifyToken(req.header("Authorization"));
+  const opponent = await fetchUserByUsername(req.body.opponent);
+  const game = await createGame({
+    creator: token["cognito:username"],
+    opponent: opponent
+  });
+  res.json(game);
+}));
+
+// Fetch game
+app.get("/games/:gameId", wrapAsync(async (req, res) => {
+  const game = await fetchGame(req.params.gameId);
+  res.json(game);
+}));
+
+// Perform move
+app.post("/games/:gameId", wrapAsync(async (req, res) => {
+  const validated = validatePerformMove(req.body);
+  if (!validated.valid) {
+    throw new Error(validated.message);
+  }
+  const token = await verifyToken(req.header("Authorization"));
+  const game = await performMove({
+    gameId: req.params.gameId,
+    user: token["cognito:username"],
+    changedHeap: req.body.changedHeap,
+    changedHeapValue: req.body.changedHeapValue
+  });
+  let opponentUsername
+  if (game.user1 !== game.lastMoveBy) {
+    opponentUsername = game.user1
+  } else {
+    opponentUsername = game.user2
+  }
+  const opponent = await fetchUserByUsername(opponentUsername);
+  const mover = {
+    username: token['cognito:username'],
+    phoneNumber: token['phone_number']
+  }
+  await handlePostMoveNotification({ game, mover, opponent })
+  res.json(game);
+}));
+
+app.use(function(error, req, res, next) {
+  res.status(400).json({ message: error.message });
+});
+
+module.exports = app;
+```
+
+At the top of this file, you import express and other dependencies, including the authentication helper functions and data access functions that you reviewed in previous modules. Then, you configure the various routes you want in your function, such as **/login** for a user to login and fetch an ID token or **/games/:gameId** to fetch the status of a particular game. Finally, at the bottom of the file, the script exports the Express application.
+
+Next, look at **application/handler.js.** This is the file with the entrypoint method that you tell Lambda to invoke on an incoming request. The contents of this file are as follows:
+
+```
+// application/handler.js
+const awsServerlessExpress = require('aws-serverless-express')
+const app = require('./app')
+const server = awsServerlessExpress.createServer(app)
+
+exports.handler = (event, context) => { awsServerlessExpress.proxy(server, event, context) }
+```
+
+This handler is using the aws-serverless-express package. This package converts an incoming API Gateway request into the standard request expected by the Express.js framework. This makes it easy to run Express.js code using Lambda and API Gateway.
+
+Let’s test your endpoint by fetching the game you created in an earlier module. This request goes through API Gateway to your Lambda function, which then makes a request to DynamoDB and returns the results.
+
+Run the following command in your terminal:
+
+```
+curl -X GET ${BASE_URL}/games/5b5ee7d8
+```
+
+You should see the following output in your terminal:
+
+```
+{"heap2":4,"heap1":3,"heap3":5,"gameId":"5b5ee7d8","user2":"theseconduser","user1":"myfirstuser","lastMoveBy":"theseconduser"}
+```
+
+Success! You hit your API endpoint. This triggered your Lambda function, which retrieved the game details for your requested game from DynamoDB.
+
+[🏠 Back to Table of Contents](#table-of-contents)
 
 
 
