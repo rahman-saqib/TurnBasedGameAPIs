@@ -1017,6 +1017,99 @@ export SECOND_ID_TOKEN=<idToken>
 ## Step 6c: Create a new game
 
 
+Now that your user has a way to authenticate, let’s create a new game. This happens in the browser for your application, as the user chooses to create a new game and enters the username of their opponent.
+
+The endpoint for creating a new game is **POST /games**, and the handler code in **application/app.js** is as follows:
+
+```
+// Create new game
+app.post("/games", wrapAsync(async (req, res) => {
+  const validated = validateCreateGame(req.body);
+  if (!validated.valid) {
+    throw new Error(validated.message);
+  }
+  const token = await verifyToken(req.header("Authorization"));
+  const opponent = await fetchUserByUsername(req.body.opponent);
+  const game = await createGame({
+    creator: token["cognito:username"],
+    opponent: opponent
+  });
+  res.json(game);
+}));
+```
+
+This code is doing a few things. First, it validates that the incoming payload is in the proper format and contains all required fields. Then, it verifies the ID token that is sent over in the Authorization header. If this token is valid, it then fetches details about the second user using the **fetchUserByUsername** function in the **auth.js** script that you reviewed in a previous module. Finally, it creates a new game by passing the username of the creator and the opponent details into the **createGame** function.
+
+The **createGame** function is in **application/data/createGame.js** and looks as follows:
+
+```
+const AWS = require("aws-sdk");
+const documentClient = new AWS.DynamoDB.DocumentClient();
+const uuidv4 = require("uuid/v4");
+const sendMessage = require("./sendMessage");
+
+const createGame = async ({ creator, opponent }) => {
+  const params = {
+    TableName: "turn-based-game",
+    Item: {
+      gameId: uuidv4().split('-')[0],
+      user1: creator,
+      user2: opponent.username,
+      heap1: 5,
+      heap2: 4,
+      heap3: 5,
+      lastMoveBy: creator
+    }
+  };
+
+  try {
+    await documentClient.put(params).promise();
+  } catch (error) {
+    console.log("Error creating game: ", error.message);
+    throw new Error("Could not create game");
+  }
+
+  const message = `Hi ${opponent.username}. Your friend ${creator} has invited you to a new game! Your game ID is ${params.Item.gameId}`;
+  try {
+    await sendMessage({ phoneNumber: opponent.phoneNumber, message });
+  } catch (error) {
+    console.log("Error sending message: ", error.message);
+    throw new Error("Could not send message to user");
+  }
+
+  return params.Item;
+};
+
+module.exports = createGame;
+```
+
+The **createGame** function generates a unique game id and saves the basic game details into DynamoDB. Then, it sends a message to the opponent to alert them that a new game has started and it is their turn to play.
+
+Let’s try using this endpoint. Run the following command in your terminal:
+
+```
+curl -X POST ${BASE_URL}/games \
+ -H 'Content-Type: application/json' \
+  -H "Authorization: ${FIRST_ID_TOKEN}" \
+  -d '{
+	"opponent": "theseconduser"
+}'
+```
+
+Note that you’re passing the ID token of the first user in the Authorization header with your request.
+
+You should see the following output in your terminal:
+
+```
+{"gameId":"433334d0","user1":"myfirstuser","user2":"theseconduser","heap1":5,"heap2":4,"heap3":5,"lastMoveBy":"myfirstuser"}
+```
+
+A new game has been created! You should receive an SMS message on the phone number you registered for the second user.
+
+
+
+
+
 
 
 
