@@ -50,6 +50,7 @@ An AWS Account with root priviliges
 4. [Add authentication to your application](#4-Add-authentication-to-your-application)
 5. [Deploy your application to AWS Lambda and Amazon API Gateway](#5-Deploy-your-application-to-AWS-Lambda-and-Amazon-API-Gateway)
 6. [Test your application](#6-Test-your-application)
+7. [Clean up and next steps](#7-Clean-up-and-next-steps)
 
 
 
@@ -1106,6 +1107,258 @@ You should see the following output in your terminal:
 
 A new game has been created! You should receive an SMS message on the phone number you registered for the second user.
 
+![alt text](https://d1.awsstatic.com/Getting%20Started/AWS-Labs-Turn-Based-Game/turn-based-game-new-game.20be251453a716777063e561cb95abc0738677ce.jpg)
+
+
+Save the value of the game Id to your terminal using the following command:
+
+(Make sure you substitute the value of your game Id for <*yourGameId*>
+	
+```
+export GAME_ID=<yourGameId>
+```
+	
+
+Try running this endpoint again but without an ID token. Run the following command in your terminal: 
+
+```
+curl -X POST ${BASE_URL}/games \
+ -H 'Content-Type: application/json' \
+  -d '{
+	"opponent": "theseconduser"
+}'
+```
+
+Because your request does not include a token, you should see the following output:
+
+```
+{"message":"jwt must be provided"}
+```
+	
+You have used your Amazon Cognito tokens to protect an endpoint.
+
+## Step 6d: Fetch the status of a game
+
+
+In this step, you can fetch the details for a particular game. This can be used in your application when a user checks their in-progress games or wants to make a move in a game.
+
+The endpoint to fetch a game is **GET /games/:gameId**, and the handler code is contained in **application/app.js** as follows:
+
+```
+// Fetch game
+app.get("/games/:gameId", wrapAsync(async (req, res) => {
+  const game = await fetchGame(req.params.gameId);
+  res.json(game);
+}));
+```
+
+This endpoint is not an authenticated endpoint as each user can see in-progress games if desired.
+
+Invoke the endpoint and fetch the game by entering the following command in your terminal:
+
+```
+curl -X GET ${BASE_URL}/games/${GAME_ID}
+```
+
+You should see the following output in your terminal:
+
+```
+{"heap2":4,"heap1":5,"heap3":5,"gameId":"32597bd8","user2":"theseconduser","user1":"myfirstuser","lastMoveBy":"myfirstuser"}
+```
+
+Success! You retrieved the game, and it has the details such as the number of objects in each heap and the users involved in the game.
+
+In the next step, you perform moves in the game.
+
+## Step 6e: Perform moves in a game
+
+
+In this final step, you simulate users performing moves in a game. This happens from your application client, such as a web browser, where users select and submit a potential move.
+
+The endpoint to fetch a user is **POST /games/:gameId**. The handler code is contained in **application/app.js** as follows:
+
+```
+// Perform move
+app.post("/games/:gameId", wrapAsync(async (req, res) => {
+  const validated = validatePerformMove(req.body);
+  if (!validated.valid) {
+    throw new Error(validated.message);
+  }
+  const token = await verifyToken(req.header("Authorization"));
+  const game = await performMove({
+    gameId: req.params.gameId,
+    user: token["cognito:username"],
+    changedHeap: req.body.changedHeap,
+    changedHeapValue: req.body.changedHeapValue
+  });
+  let opponentUsername
+  if (game.user1 !== game.lastMoveBy) {
+    opponentUsername = game.user1
+  } else {
+    opponentUsername = game.user2
+  }
+  const opponent = await fetchUserByUsername(opponentUsername);
+  const mover = {
+    username: token['cognito:username'],
+    phoneNumber: token['phone_number']
+  }
+  await handlePostMoveNotification({ game, mover, opponent })
+  res.json(game);
+}));
+```
+
+The handler does a number of things. First, it validates that the request payload matches the required shape. If the payload shape passes validation, it then verifies the given Authorization header to identify the user requesting the game. After verification, it then attempts to perform a move using the **performMove** function. This function is similar to the performMove function in the DynamoDB module, as it performs an **UpdateItem API** call with all of the conditions needed.
+
+After the move is successfully performed, your application then needs to send any post-move notifications. It first fetches the opponent by username to get the phone number for the user. Then, it passes the game, mover, and opponent into the **handlePostMoveNotification** method. That method is shown below:
+
+```
+const sendMessage = require('./sendMessage')
+
+const handlePostMoveNotification = async ({ game, mover, opponent }) => {
+  // Handle when game is finished
+  if (game.heap1 == 0 && game.heap2 == 0 && game.heap3 == 0) {
+    const winnerMessage = `You beat ${mover.username} in a game of Nim!`
+    const loserMessage = `Ahh, you lost to ${opponent.username} in Nim.`
+    await Promise.all([
+      sendMessage({ phoneNumber: opponent.phoneNumber, message: winnerMessage }),
+      sendMessage({ phoneNumber: mover.phoneNumber, message: loserMessage })
+    ])
+
+    return
+  }
+
+  const message = `${mover.username} has moved. It's your turn next in Game ID ${game.gameId}!`
+  await sendMessage({ phoneNumber: opponent.phoneNumber, message })
+};
+
+module.exports = handlePostMoveNotification;
+```
+
+The **handlePostMoveNotification** first checks to see if the game is over because all heaps are empty. If so, it sends winning and losing notifications to the respective users. If the game is not over, it then notifies the opponent that it is their turn to play.
+
+Try performing a move with the following command:
+
+```
+curl -X POST ${BASE_URL}/games/${GAME_ID} \
+  -H "Authorization: ${SECOND_ID_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"changedHeap": "heap1",
+	"changedHeapValue": 0
+}'
+```
+
+Note that it is the second user making this request -- as indicated by usage of the **SECOND_ID_TOKEN** for authorization -- and that the user is setting the value of *heap1* to **0**.
+
+You should see the following results in your terminal:
+
+```
+{"heap2":4,"heap1":0,"heap3":5,"gameId":"32597bd8","user2":"theseconduser","user1":"myfirstuser","lastMoveBy":"theseconduser"}
+```
+
+The response includes the current state of the game and indicates that heap1 now has 0 elements, and that the last move was by *theseconduser*.
+
+You should have also received a notification for the first user that it’s their turn to move.
+turn-based-game-second-user
+
+![alt text](https://d1.awsstatic.com/Getting%20Started/AWS-Labs-Turn-Based-Game/turn-based-game-second-user.94b85839e5fbbc86ff30f1252ab458a2d480a59c.jpg)
+
+Let’s simulate the end of a game by making two more moves.
+
+First, have the first user remove all the items in heap 2 by running the following command:
+
+```
+curl -X POST ${BASE_URL}/games/${GAME_ID} \
+  -H "Authorization: ${FIRST_ID_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"changedHeap": "heap2",
+	"changedHeapValue": 0
+}'
+```
+
+You should see the following output in your terminal:
+
+```
+{"heap2":0,"heap1":0,"heap3":5,"gameId":"32597bd8","user2":"theseconduser","user1":"myfirstuser","lastMoveBy":"myfirstuser"}
+```
+
+Finally, have the second user remove all the objects from the third pile, which ends the game:
+
+```
+curl -X POST ${BASE_URL}/games/${GAME_ID} \
+  -H "Authorization: ${SECOND_ID_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"changedHeap": "heap3",
+	"changedHeapValue": 0
+}'
+```
+
+You should see the following output in your terminal:
+
+```
+{"heap2":0,"heap1":0,"heap3":0,"gameId":"32597bd8","user2":"theseconduser","user1":"myfirstuser","lastMoveBy":"theseconduser"}
+```
+
+This ends the game, which triggers the end-of-game notifications for both users.
+
+This screen capture shows the notification for both users, as both users were configured to use the same phone number.
+
+![alt text](https://d1.awsstatic.com/Getting%20Started/AWS-Labs-Turn-Based-Game/turn-based-game-end.bf6b84ea345c78c05460bb8bb2ff71da4801f907.jpg)
+
+[🏠 Back to Table of Contents](#table-of-contents)
+
+# 7. Clean up and next steps
+
+In the previous steps, you built a turn-based game with notifications to alert users. To build this game, you used:
+
+   • Amazon DynamoDB and for state storage
+   
+   • Amazon SNS for SMS messaging
+   
+   • Amazon Cognito for user authentication
+   
+   • AWS Lambda for compute
+   
+   • Amazon API Gateway for HTTP routing
+
+These tools provide flexible, high-scale solutions to many problems you face when building high-traffic game applications.
+
+In the following steps, you clean up the resources you created in this lab.
+
+## Step 7a: Delete AWS Lambda, Amazon API Gateway, Amazon DynamoDB, and Amazon Cognito resources
+
+
+First, delete your application resources.
+
+In the **scripts/** folder, there is a file called **delete-resources.sh.** This script deletes your Lambda function, your API Gateway REST API, your function’s IAM role, your DynamoDB table, and your Amazon Cognito user pool.
+
+Execute this script with the following command in your terminal:
+
+```
+bash scripts/delete-resources.sh
+```
+
+You should see the following output in your terminal:
+
+```
+Removing REST API
+Deleting IAM role
+Deleting Lambda function
+Deleting Cognito User Pool
+Deleting DynamoDB table
+```
+
+## Step 7b: Delete the AWS Cloud9 environment
+
+Finally, delete the AWS Cloud9 environment that you used in this lab:
+
+   1. Navigate to the AWS Cloud9 console.
+   2. Choose the **Turn-based game** environment and choose **Delete**.
+   3. In dialog box, type *Delete* and choose **Delete**.
+
+[🏠 Back to Table of Contents](#table-of-contents)
 
 
 
