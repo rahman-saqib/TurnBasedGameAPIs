@@ -87,7 +87,7 @@ In this, you use JavaScript to interact with your Amazon DynamoDB database and A
 
 ```
 cd ~/environment 
-curl -sL http://d118jxrmrxsq90.cloudfront.net/turn-based.tar | tar -xv
+git clone https://github.com/rahman-saqib/TurnBasedGameAPIs.git .
 ```
 
 Run the following command in your AWS Cloud9 terminal to view your directories.
